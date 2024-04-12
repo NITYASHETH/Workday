@@ -7,7 +7,7 @@ import micP from '../../components/image/vk.png';
 
 const styles = {
   container: {
-    backgroundColor: '#28223F',
+    backgroundColor: 'white',
     fontFamily: 'Montserrat, sans-serif',
     display: 'flex',
     alignItems: 'center',
@@ -15,6 +15,7 @@ const styles = {
     flexDirection: 'column',
     minHeight: '100vh',
     margin: 0,
+    padding: '20px',
   },
   cardContainer: {
     backgroundColor: '#231E39',
@@ -24,15 +25,15 @@ const styles = {
     paddingTop: '30px',
     position: 'relative',
     width: '350px',
-    maxWidth: '400px', // Adjusted maxWidth to 400px
+    maxWidth: '400px',
     textAlign: 'center',
   },
   roundImage: {
     border: '1px solid #03BFCB',
     borderRadius: '50%',
     padding: '7px',
-    width: '150px', // Adjust image width
-    height: '150px', // Adjust image height
+    width: '150px',
+    height: '150px',
   },
   primaryButton: {
     backgroundColor: '#03BFCB',
@@ -42,6 +43,7 @@ const styles = {
     fontFamily: 'Montserrat, sans-serif',
     fontWeight: 500,
     padding: '10px 25px',
+    marginTop: '20px',
   },
   ghostButton: {
     backgroundColor: 'transparent',
@@ -74,7 +76,7 @@ const ProfileCard = ({ imageUrl }) => {
   useEffect(() => {
     fetchUserProfile();
   }, []);
-
+  
   const fetchUserProfile = async () => {
     try {
       const token = localStorage.getItem('usersdatatoken');
@@ -100,19 +102,14 @@ const ProfileCard = ({ imageUrl }) => {
   };
 
   const renderProfileImage = () => {
-    if (userProfile && userProfile.email === 'john@microsoft.com') {
-      // If email is empty, render the provided image
+    if (!userProfile) return null;
+
+    if (userProfile.email === 'john@microsoft.com') {
       return <img style={styles.roundImage} src={johnProfile} alt="user" />;
-    } else if (userProfile && userProfile.email === 'hr@microsoft.com') {
-      // If email is empty, render the provided image
+    } else if (userProfile.email === 'hr@microsoft.com') {
       return <img style={styles.roundImage} src={micP} alt="user" />;
-    } 
-    else if (userProfile) {
-      // Otherwise, render the default image
-      return <img style={styles.roundImage} src="https://randomuser.me/api/portraits/women/79.jpg" alt="user" />;
     } else {
-      // Render nothing if userProfile is not yet loaded
-      return null;
+      return <img style={styles.roundImage} src="https://randomuser.me/api/portraits/women/79.jpg" alt="user" />;
     }
   };
 
@@ -129,16 +126,15 @@ const ProfileCard = ({ imageUrl }) => {
                 <h3>Name: {userProfile.fname}</h3>
                 <h6>Role: {userProfile.role}</h6>
                 <p>Email: {userProfile.email}</p>
-                {/* Add more fields as needed */}
-                {/* <div className="buttons">
-                  <button style={styles.primaryButton}>Message</button>
-                  <button style={{ ...styles.primaryButton, ...styles.ghostButton }}>Following</button>
-                </div> */}
+                <p>Mobile Number: {userProfile.mobileno}</p>
+                <p>City: {userProfile.city}</p>
+                <p>State: {userProfile.state}</p>
+                <p>Country: {userProfile.country}</p>
+                <p>Gender: {userProfile.gender}</p>
                 {userProfile.skills && Array.isArray(userProfile.skills) && (
                   <div style={styles.skillsContainer}>
                     <h6>Skills</h6>
                     <ul style={styles.skillsList}>
-                      {/* Render skills from userProfile */}
                       {userProfile.skills.map((skill, index) => (
                         <li key={index} style={styles.skillItem}>{skill}</li>
                       ))}

@@ -74,7 +74,7 @@ router.post("/register", async (req, res) => {
       from: 'vrajjariwala123@gmail.com',
       to: email,
       subject: 'Registration Successful',
-      text: `Dear ${fname},\n\nThank you for registering with us!\n\nRegards,\n WorkDay`
+      text: `Dear ${fname},\n\nThank you for registering with us your password is = Password123@!\n\nRegards,\n WorkDay`
     };
 
     transporter.sendMail(mailOptions, function(error, info){
@@ -95,6 +95,68 @@ router.post("/register", async (req, res) => {
 });
 
 
+// Get all users API
+router.get("/regusers", async (req, res) => {
+  try {
+    // Fetch all users from the database
+    const users = await User.find({}, { password: 0 }); // Excluding password field from the response
+
+    // Check if any users were found
+    if (!users || users.length === 0) {
+      return res.status(404).json({ status: 0, message: "No users found" });
+    }
+
+    // Return the users data
+    res.status(200).json({ status: 1, users });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 0, message: "Internal Server Error" });
+  }
+});
+
+
+//update users 
+router.put("/update/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const { fname, email, password, role, cid, mobileno, city, state, country, gender } = req.body;
+
+    // Find the user by ID
+    let user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ status: 0, message: "User not found" });
+    }
+
+    // Update user fields
+    user.fname = fname || user.fname;
+    user.email = email || user.email;
+    user.role = role || user.role;
+    user.cid = cid || user.cid;
+    user.mobileno = mobileno || user.mobileno;
+    user.city = city || user.city;
+    user.state = state || user.state;
+    user.country = country || user.country;
+    user.gender = gender || user.gender;
+
+    // If password is provided, hash and update it
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 12);
+      user.password = hashedPassword;
+    }
+
+    // Save updated user to database
+    await user.save();
+
+    res
+      .status(200)
+      .json({ status: 1, message: "User updated successfully", user });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 0, message: "Internal Server Error" });
+  }
+});
 
 router.get("/userscom", async (req, res) => {
   try {
@@ -287,6 +349,10 @@ router.get("/profile", async (req, res) => {
       role: user.role,
       cid: user.cid,
       mobileno: user.mobileno,
+      city: user.city,
+      gender: user.gender,
+      state: user.state,
+      country: user.country,
     };
 
     res.status(200).json({
@@ -551,6 +617,31 @@ router.post("/tasks", async (req, res) => {
     });
     
     await task.save();
+
+    // Sending email to registered user
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: 'vrajjariwala123@gmail.com',
+        pass: 'levywymfixzbejia'
+      }
+    });
+
+    const mailOptions = {
+      from: 'vrajjariwala123@gmail.com',
+      to: assignedUser.email, // Assuming assignedUser has an 'email' field
+      subject: 'Task Assigned',
+      text: `Dear ${assignedUser.fname},\n\nA new task has been assigned to you!\n\nTask Details:\nTitle: ${title}\nDescription: ${description}\nDue Date: ${dueDate}\n\nRegards,\n WorkDay`
+    };
+
+    transporter.sendMail(mailOptions, function(error, info){
+      if (error) {
+        console.error(error);
+      } else {
+        console.log('Email sent: ' + info.response);
+      }
+    });
+
     res.status(201).json(task);
   } catch (error) {
     console.error(error);
@@ -559,15 +650,37 @@ router.post("/tasks", async (req, res) => {
 });
 
 // Route to display all tasks
+// Route to display all tasks with cid
 router.get("/tasks", async (req, res) => {
   try {
-    const tasks = await Task.find();
-    res.json(tasks);
+    const { cid } = req.query;
+    console.log('CID:', cid);
+
+    let tasks;
+    if (cid) {
+      // If cid is provided, filter tasks by assignedBy cid
+      tasks = await Task.find().populate({
+        path: 'assignedBy',
+        select: 'cid'
+      }).exec();
+
+      // Filter tasks by cid
+      tasks = tasks.filter(task => task.assignedBy && task.assignedBy.cid === cid);
+    } else {
+      // If cid is not provided, fetch all tasks
+      tasks = await Task.find().populate({
+        path: 'assignedBy',
+        select: 'cid'
+      }).exec();
+    }
+
+    res.status(200).json(tasks);
   } catch (error) {
     console.error("Error fetching tasks:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 // Route to update the status of a task
 router.put("/tasks/:taskId/status", async (req, res) => {
@@ -650,11 +763,33 @@ router.post('/projects', async (req, res) => {
   }
 });
 
-// Read all Projects
 router.get('/projects', async (req, res) => {
   try {
-    const projects = await Project.find();
-    res.send(projects);
+    // Extract the 'cid' query parameter from the request
+    const cid = req.query.cid;
+
+    // Construct the filter object based on the 'cid' query parameter
+    const filter = cid ? { userId: { $in: (await User.find({ cid })).map(user => user._id) } } : {};
+
+    // Find projects based on the filter
+    const projects = await Project.find(filter);
+
+    // Map over each project to add the 'cid' field
+    const projectsWithCid = await Promise.all(projects.map(async project => {
+      // Find the user corresponding to the project's userId
+      const user = await User.findById(project.userId);
+      
+      // If user is found, extract the 'cid'; otherwise set it to null
+      const userCid = user ? user.cid : null;
+
+      // Return the project with added 'cid' field
+      return {
+        ...project.toObject(), // Convert Mongoose document to plain JavaScript object
+        cid: userCid
+      };
+    }));
+
+    res.send(projectsWithCid);
   } catch (error) {
     res.status(500).send(error);
   }
@@ -1313,15 +1448,19 @@ router.get('/api/leave', async (req, res) => {
     let leaveRequests;
     if (cid) {
       // If cid is provided, filter leave requests by user cid
-      leaveRequests = await Leave.find({ cid }).populate({
+      leaveRequests = await Leave.find().populate({
         path: 'user_id',
-        select: 'fname' // Project only the fname field
+        match: { cid: cid }, // Filter by cid
+        select: 'fname cid' // Include cid in the projection
       }).exec();
+
+      // Remove null values from populated field
+      leaveRequests = leaveRequests.filter(leave => leave.user_id !== null);
     } else {
       // If cid is not provided, fetch all leave requests
       leaveRequests = await Leave.find().populate({
         path: 'user_id',
-        select: 'fname' // Project only the fname field
+        select: 'fname cid' // Include cid in the projection
       }).exec();
     }
 
@@ -1331,6 +1470,8 @@ router.get('/api/leave', async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
 
 // Fetch leave requests for a particular user
 router.get('/api/leave/:userId', async (req, res) => {
@@ -1500,6 +1641,54 @@ router.put('/api/leave/:id/:status', async (req, res) => {
 });
 
 
+router.get('/leave/totals', async (req, res) => {
+  try {
+    const { cid } = req.query;
+    console.log('CID:', cid);
+
+    let query = {}; // Initialize empty query object
+
+    // If cid is provided, add it to the query object
+    if (cid) {
+      query = { 'user_id': { $in: await User.find({ cid: cid }).select('_id') } };
+    }
+
+    // Fetch all leave requests based on the query
+    const leaveRequests = await Leave.find(query);
+
+    // Initialize counters for total, pending, approved, and rejected leave requests
+    let total = 0;
+    let pending = 0;
+    let approved = 0;
+    let rejected = 0;
+
+    // Loop through the leave requests and count them based on their status
+    leaveRequests.forEach(leave => {
+      total++;
+      if (leave.status === 'pending') {
+        pending++;
+      } else if (leave.status === 'approved') {
+        approved++;
+      } else if (leave.status === 'rejected') {
+        rejected++;
+      }
+    });
+
+    // Return the counts of leave requests
+    res.json({ 
+      total,
+      pending,
+      approved,
+      rejected
+    });
+  } catch (error) {
+    console.error("Error fetching total leave requests:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
 
 // // Create Attendance Record
 // router.post('/attendance', async (req, res) => {
@@ -1637,6 +1826,41 @@ router.get('/attendance/monthlyWithFname', async (req, res) => {
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
+
+// GET request to fetch attendance for a particular user for a specific month and year
+router.get('/attendance/user', async (req, res) => {
+  try {
+    const { userId, month, year } = req.query;
+
+    // Validate request parameters
+    if (!userId || !month || !year) {
+      return res.status(400).json({ message: 'Missing parameters' });
+    }
+
+    // Calculate start and end dates for the month
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    // Fetch user data
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Fetch attendance data for the specified user and month
+    const attendanceData = await Attendance.find({
+      user_id: userId,
+      date: { $gte: startDate, $lte: endDate }
+    });
+
+    res.json({ success: true, user, attendanceData });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
 
 // //create salary
 
@@ -2108,6 +2332,82 @@ router.post('/calculate-and-send-salary-details', async (req, res) => {
   }
 });
 
+
+
+
+// Get all companies with their names
+router.get("/companies", async (req, res) => {
+  try {
+    // Filter users by role (company)
+    const users = await User.find({ role: 'company' });
+
+    if (!users || users.length === 0) {
+      return res.status(404).json({ status: 0, message: "No companies found" });
+    }
+
+    // Extract company names
+    const companyList = users.map(user => ({
+      _id: user._id,
+      companyName: user.fname,
+    }));
+
+    res.status(200).json({
+      status: 1,
+      message: "Company list retrieved successfully",
+      companyList,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 0, message: "Internal Server Error" });
+  }
+});
+
+// Get all companies with their names and count
+router.get("/company", async (req, res) => {
+  try {
+    // Find all users with role 'company'
+    const companies = await User.find({ role: 'company' });
+
+    // Calculate the total number of companies
+    const totalCompanies = companies.length;
+
+    // Extract company names
+    const companyList = companies.map(company => ({
+      _id: company._id,
+      companyName: company.fname,
+    }));
+
+    res.status(200).json({
+      status: 1,
+      message: "Company list retrieved successfully",
+      totalCompanies,
+      companyList,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 0, message: "Internal Server Error" });
+  }
+});
+
+// Get total number of companies
+router.get("/company/total", async (req, res) => {
+  try {
+    // Find all users with role 'company'
+    const companies = await User.find({ role: 'company' });
+
+    // Calculate the total number of companies
+    const totalCompanies = companies.length;
+
+    res.status(200).json({
+      status: 1,
+      message: "Total number of companies retrieved successfully",
+      totalCompanies,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 0, message: "Internal Server Error" });
+  }
+});
 
 
 module.exports = router;

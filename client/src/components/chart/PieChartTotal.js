@@ -39,14 +39,14 @@ const PieChartTotal = () => {
           datasets: [{
             data: [totalSalary, extraCost, profit],
             backgroundColor: [
-              "#6ECF3",
-              "rgba(255, 99, 132, 0.5)",
-              "rgba(54, 162, 235, 0.5)"
+              "#75C9E6", // Total Salary
+              "#FFDFA6", // Extra Cost
+              "#FFFBDD" // Profit
             ],
             borderColor: [
-              "#6ECF3",
-              "rgba(255, 99, 132, 1)",
-              "rgba(54, 162, 235, 1)"
+              "#75C9E6",
+              "#FFDFA6",
+              "#FFFBDD"
             ],
             borderWidth: 1,
           }]

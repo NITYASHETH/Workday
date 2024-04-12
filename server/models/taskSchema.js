@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 
 // Define task schema
 const taskSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', // Ass uming you have a User model
+    // required: true
+  },
   project: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Project',

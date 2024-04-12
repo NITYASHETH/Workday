@@ -13,6 +13,6 @@ app.use(cookieParser());
 app.use(cors());
 app.use(router);
 
-app.listen(port, () => {
-  console.log(`Server started at port ${port}`);
+app.listen(process.env.PORT || 3001, function(){
+  console.log("Express server listening on port %d in %s mode", this.address().port, app.settings.env);
 });
